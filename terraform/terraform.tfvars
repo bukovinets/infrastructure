@@ -1,0 +1,5 @@
+proxmox_api_url          = "https://10.0.0.11:8006/api2/json"
+proxmox_api_token_id     = "terraform@pve!terraform"
+proxmox_api_token_secret = "e481c56e-ccaf-4a3a-939d-a239eb9e9f20"
+ssh_public_key           = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJci5l3DvW6sjt7v9HaMY/UtSRmJf89IVS6kbxFE475W bukovinets@Laptop"
+proxmox_node             = "10.0.0.11"
