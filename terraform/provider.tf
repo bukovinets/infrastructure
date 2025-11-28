@@ -1,22 +1,23 @@
 variable "proxmox_api_url" {
   type = string
+  description = "Format: https://10.0.0.11:8006/api2/json/"
 }
 
-variable "proxmox_api_token_id" {
+variable "proxmox_api_token" {
   type = string
   sensitive = true
-}
-
-variable "proxmox_api_token_secret" {
-  type = string
-  sensitive = true
+  description = "Format: USER@REALM!TOKENID=UUID"
 }
 
 provider "proxmox" {
-  pm_api_url          = var.proxmox_api_url
-  pm_api_token_id     = var.proxmox_api_token_id
-  pm_api_token_secret = var.proxmox_api_token_secret
+  endpoint = var.proxmox_api_url
+  api_token = var.proxmox_api_token
   
-  # SSL verification (set to true if you have valid certs)
-  pm_tls_insecure = false
+  # Ignore self-signed certs
+  insecure = true
+  
+  # Optimization for Proxmox 9
+  ssh {
+    agent = true
+  }
 }

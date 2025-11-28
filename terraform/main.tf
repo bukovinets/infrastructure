@@ -1,126 +1,164 @@
 locals {
-  # Detect current workspace (dev or prod). Default to dev if unknown.
   env = terraform.workspace == "default" ? "dev" : terraform.workspace
-  
-  # Helper to calculate starting IP octet
   base_ip = var.ip_offsets[local.env]
 }
 
 # --- K3s Master Node(s) ---
-resource "proxmox_vm_qemu" "k3s_master" {
-  count       = var.k3s_master_count[local.env]
-  name        = "${local.env}-k3s-master-${count.index + 1}"
-  target_node = var.proxmox_node
-  clone       = var.template_name
+resource "proxmox_virtual_environment_vm" "k3s_master" {
+  count     = var.k3s_master_count[local.env]
+  name      = "${local.env}-k3s-master-${count.index + 1}"
+  node_name = var.proxmox_node
   
-  # Basic Settings
-  agent    = 1
-  os_type  = "cloud-init"
-  cores    = var.vm_specs[local.env].k3s_cpu
-  sockets  = 1
-  cpu      = "host"
-  memory   = var.vm_specs[local.env].k3s_mem
-  scsihw   = "virtio-scsi-pci"
-  bootdisk = "scsi0"
+  on_boot = true
+  started = true
+
+  clone {
+    vm_id = var.template_vm_id
+  }
+
+  # DISABLED to prevent hang. Enable only if 'qemu-guest-agent' is installed in template.
+  agent {
+    enabled = false
+  }
+
+  cpu {
+    cores = var.vm_specs[local.env].k3s_cpu
+    type  = "host"
+  }
+
+  memory {
+    dedicated = var.vm_specs[local.env].k3s_mem
+  }
 
   disk {
-    slot = 0
-    size = "20G"
-    type = "scsi"
-    storage = "local-lvm" # Change to your storage ID (e.g., 'local-zfs', 'ceph')
-    iothread = 1
+    datastore_id = "local-lvm"
+    interface    = "scsi0"
+    size         = 20
+    file_format  = "raw"
   }
 
-  network {
-    model  = "virtio"
+  network_device {
     bridge = "vmbr0"
+    model  = "virtio"
   }
 
-  # Cloud-Init Config
-  ciuser  = "ubuntu"
-  sshkeys = var.ssh_public_key
-  
-  # IP Address Calculation: Offset + 0-9 range for Masters
-  # Example Dev: 192.168.1.110 (Master 1)
-  ipconfig0 = "ip=192.168.1.${local.base_ip + count.index}/24,gw=${var.network_gateway}"
-  
-  lifecycle {
-    ignore_changes = [network]
+  initialization {
+    ip_config {
+      ipv4 {
+        address = "${var.network_prefix}.${local.base_ip + count.index}/24"
+        gateway = var.network_gateway
+      }
+    }
+    
+    user_account {
+      username = "ubuntu"
+      keys     = [var.ssh_public_key]
+    }
   }
 }
 
 # --- K3s Worker Node(s) ---
-resource "proxmox_vm_qemu" "k3s_worker" {
-  count       = var.k3s_worker_count[local.env]
-  name        = "${local.env}-k3s-worker-${count.index + 1}"
-  target_node = var.proxmox_node
-  clone       = var.template_name
+resource "proxmox_virtual_environment_vm" "k3s_worker" {
+  count     = var.k3s_worker_count[local.env]
+  name      = "${local.env}-k3s-worker-${count.index + 1}"
+  node_name = var.proxmox_node
+
+  # Serialization: Wait for Masters
+  depends_on = [proxmox_virtual_environment_vm.k3s_master]
+
+  on_boot = true
+  started = true
   
-  agent    = 1
-  os_type  = "cloud-init"
-  cores    = var.vm_specs[local.env].k3s_cpu
-  memory   = var.vm_specs[local.env].k3s_mem
-  scsihw   = "virtio-scsi-pci"
-  bootdisk = "scsi0"
+  clone {
+    vm_id = var.template_vm_id
+  }
+
+  agent { enabled = false }
+
+  cpu {
+    cores = var.vm_specs[local.env].k3s_cpu
+    type  = "host"
+  }
+
+  memory {
+    dedicated = var.vm_specs[local.env].k3s_mem
+  }
 
   disk {
-    slot = 0
-    size = "20G"
-    type = "scsi"
-    storage = "local-lvm"
+    datastore_id = "local-lvm"
+    interface    = "scsi0"
+    size         = 20
+    file_format  = "raw"
   }
 
-  network {
-    model  = "virtio"
+  network_device {
     bridge = "vmbr0"
+    model  = "virtio"
   }
 
-  ciuser  = "ubuntu"
-  sshkeys = var.ssh_public_key
-
-  # IP Address Calculation: Offset + 10-20 range for Workers
-  # Example Dev: 192.168.1.120 (Worker 1)
-  ipconfig0 = "ip=192.168.1.${local.base_ip + 10 + count.index}/24,gw=${var.network_gateway}"
-
-  lifecycle {
-    ignore_changes = [network]
+  initialization {
+    ip_config {
+      ipv4 {
+        address = "${var.network_prefix}.${local.base_ip + 10 + count.index}/24"
+        gateway = var.network_gateway
+      }
+    }
+    user_account {
+      username = "ubuntu"
+      keys     = [var.ssh_public_key]
+    }
   }
 }
 
-# --- Standalone Postgres DB ---
-resource "proxmox_vm_qemu" "postgres_db" {
-  count       = 1 # Always 1 DB per env
-  name        = "${local.env}-postgres-db"
-  target_node = var.proxmox_node
-  clone       = var.template_name
+# --- Postgres DB ---
+resource "proxmox_virtual_environment_vm" "postgres_db" {
+  count     = 1
+  name      = "${local.env}-postgres-db"
+  node_name = var.proxmox_node
+
+  # Serialization: Wait for Workers
+  depends_on = [proxmox_virtual_environment_vm.k3s_worker]
+
+  on_boot = true
+  started = true
   
-  agent    = 1
-  os_type  = "cloud-init"
-  cores    = var.vm_specs[local.env].db_cpu
-  memory   = var.vm_specs[local.env].db_mem
-  scsihw   = "virtio-scsi-pci"
-  bootdisk = "scsi0"
+  clone {
+    vm_id = var.template_vm_id
+  }
+
+  agent { enabled = false }
+
+  cpu {
+    cores = var.vm_specs[local.env].db_cpu
+    type  = "host"
+  }
+
+  memory {
+    dedicated = var.vm_specs[local.env].db_mem
+  }
 
   disk {
-    slot = 0
-    size = "40G" # Larger disk for DB
-    type = "scsi"
-    storage = "local-lvm"
+    datastore_id = "local-lvm"
+    interface    = "scsi0"
+    size         = 40
+    file_format  = "raw"
   }
 
-  network {
-    model  = "virtio"
+  network_device {
     bridge = "vmbr0"
+    model  = "virtio"
   }
 
-  ciuser  = "ubuntu"
-  sshkeys = var.ssh_public_key
-
-  # IP Address Calculation: Offset + 30 for DB
-  # Example Dev: 192.168.1.140
-  ipconfig0 = "ip=192.168.1.${local.base_ip + 30}/24,gw=${var.network_gateway}"
-  
-  lifecycle {
-    ignore_changes = [network]
+  initialization {
+    ip_config {
+      ipv4 {
+        address = "${var.network_prefix}.${local.base_ip + 30}/24"
+        gateway = var.network_gateway
+      }
+    }
+    user_account {
+      username = "ubuntu"
+      keys     = [var.ssh_public_key]
+    }
   }
 }
