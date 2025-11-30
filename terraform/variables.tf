@@ -13,6 +13,12 @@ variable "template_vm_id" {
   default     = 100
 }
 
+variable "proxmox_storage" {
+  description = "The Proxmox storage ID to place VM disks on (e.g., NAS, local-zfs)"
+  type        = string
+  default     = "NAS"
+}
+
 variable "k3s_master_count" {
   type    = map(number)
   default = { dev = 1, prod = 1 }

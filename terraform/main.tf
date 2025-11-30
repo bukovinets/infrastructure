@@ -16,7 +16,6 @@ resource "proxmox_virtual_environment_vm" "k3s_master" {
     vm_id = var.template_vm_id
   }
 
-  # DISABLED to prevent hang. Enable only if 'qemu-guest-agent' is installed in template.
   agent {
     enabled = false
   }
@@ -31,10 +30,10 @@ resource "proxmox_virtual_environment_vm" "k3s_master" {
   }
 
   disk {
-    datastore_id = "local-lvm"
+    datastore_id = var.proxmox_storage
     interface    = "scsi0"
-    size         = 20
-    file_format  = "raw"
+    size         = 50
+    file_format  = "qcow2"
   }
 
   network_device {
@@ -63,7 +62,6 @@ resource "proxmox_virtual_environment_vm" "k3s_worker" {
   name      = "${local.env}-k3s-worker-${count.index + 1}"
   node_name = var.proxmox_node
 
-  # Serialization: Wait for Masters
   depends_on = [proxmox_virtual_environment_vm.k3s_master]
 
   on_boot = true
@@ -85,10 +83,10 @@ resource "proxmox_virtual_environment_vm" "k3s_worker" {
   }
 
   disk {
-    datastore_id = "local-lvm"
+    datastore_id = var.proxmox_storage
     interface    = "scsi0"
-    size         = 20
-    file_format  = "raw"
+    size         = 50
+    file_format  = "qcow2"
   }
 
   network_device {
@@ -116,7 +114,6 @@ resource "proxmox_virtual_environment_vm" "postgres_db" {
   name      = "${local.env}-postgres-db"
   node_name = var.proxmox_node
 
-  # Serialization: Wait for Workers
   depends_on = [proxmox_virtual_environment_vm.k3s_worker]
 
   on_boot = true
@@ -138,10 +135,10 @@ resource "proxmox_virtual_environment_vm" "postgres_db" {
   }
 
   disk {
-    datastore_id = "local-lvm"
+    datastore_id = var.proxmox_storage
     interface    = "scsi0"
-    size         = 40
-    file_format  = "raw"
+    size         = 50
+    file_format  = "qcow2"
   }
 
   network_device {
