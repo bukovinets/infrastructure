@@ -48,5 +48,5 @@ variable "network_gateway" {
 }
 
 variable "ip_offsets" {
-  default = { dev = 150, prod = 180 }
+  default = { dev = 150, prod = 190 }
 }
