@@ -49,6 +49,10 @@ resource "proxmox_virtual_environment_vm" "k3s_master" {
       }
     }
     
+    dns {
+      servers = [var.network_dns]
+    }
+    
     user_account {
       username = "ubuntu"
       keys     = [var.ssh_public_key]
@@ -101,6 +105,11 @@ resource "proxmox_virtual_environment_vm" "k3s_worker" {
         gateway = var.network_gateway
       }
     }
+    
+    dns {
+      servers = [var.network_dns]
+    }
+
     user_account {
       username = "ubuntu"
       keys     = [var.ssh_public_key]
@@ -153,6 +162,11 @@ resource "proxmox_virtual_environment_vm" "postgres_db" {
         gateway = var.network_gateway
       }
     }
+    
+    dns {
+      servers = [var.network_dns]
+    }
+
     user_account {
       username = "ubuntu"
       keys     = [var.ssh_public_key]

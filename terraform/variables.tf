@@ -47,6 +47,11 @@ variable "network_gateway" {
   default = "10.0.0.1"
 }
 
+variable "network_dns" {
+  type    = string
+  default = "10.0.0.1"
+}
+
 variable "ip_offsets" {
-  default = { dev = 150, prod = 190 }
+  default = { dev = 150, prod = 180 }
 }
