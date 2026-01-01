@@ -1,0 +1,25 @@
+# Development environment values
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+
+ingress:
+  hosts:
+    - host: dev.app.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources: 
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  FLASK_DEBUG: "1"

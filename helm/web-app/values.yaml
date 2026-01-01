@@ -1,0 +1,102 @@
+# Default values for electricity-comparison.
+
+replicaCount: 1
+
+image:
+  repository: harbor.bukovinets.xyz/electricity/electricity-app
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v1"
+
+imagePullSecrets:
+  - name: harbor-registry-secret
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: "traefik"
+  annotations:
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: dev.app.local
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: app.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: 
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application specific configuration
+env:
+  FLASK_APP: "run.py"
+  FLASK_DEBUG: "0"
+  # DATABASE_URL will be provided via Secret
+
+celery:
+  enabled: true
+  replicaCount: 1
+  command: ["celery", "-A", "app.celery:celery", "worker", "--loglevel=info"]
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+secret:
+  databaseUrl: "postgresql://user:password@host:5432/dbname" # Base64 encoded in template NOT here, or just plain string here and encoded there. Actually secrets should be separate.
+  # For safety in this template we assume the user provides the plain text and we encode it, OR they provide it via a separate secret management system.
+  # For this simple setup, we'll put a placeholder.
+
